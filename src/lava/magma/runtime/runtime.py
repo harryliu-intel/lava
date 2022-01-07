@@ -34,10 +34,24 @@ from lava.magma.core.run_conditions import AbstractRunCondition
 
 # Function to build and attach a system process to
 def target_fn(*args, **kwargs):
-    builder = kwargs.pop("builder")
-    actor = builder.build()
-    actor.start(*args, **kwargs)
-
+    import cProfile
+    import os
+    import time
+    if 'PROFILE' in os.environ:
+        if hasattr(kwargs['builder'], 'proc_model'):
+            model = str(kwargs['builder'].proc_model).split("'")[1].split('.')[-1]
+        else:
+            model = "RuntimeService"
+        timer = time.process_time_ns if os.environ['PROFILE'] == 'cpu' else time.perf_counter_ns
+        with cProfile.Profile(timer, 1e-9) as pr:
+            builder = kwargs.pop("builder")
+            actor = builder.build()
+            actor.start(*args, **kwargs)
+        pr.dump_stats("{}_{}.{}.profile".format(os.environ['PROFILE_PREFIX'], model, os.environ['PROFILE']))
+    else:
+        builder = kwargs.pop("builder")
+        actor = builder.build()
+        actor.start(*args, **kwargs)
 
 class Runtime:
     """Lava runtime which consumes an executable and run run_condition. Exposes
